@@ -1,0 +1,6 @@
+preprocessed_point_clouds
+preprocessed_point_clouds/
+preprocessed_point_clouds/*
+__pycache__/
+__pycache__
+__pycache__/*
