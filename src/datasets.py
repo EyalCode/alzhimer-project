@@ -31,4 +31,3 @@ class TUBerlinDataset(Dataset):
         point_clouds = torch.stack(point_clouds, dim=0)
         labels = torch.tensor(labels, dtype=torch.long)
         return point_clouds, labels
-    
