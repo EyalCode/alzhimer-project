@@ -11,7 +11,7 @@ args = {
     'num_points': 1024,
     'num_classes': 250,
     'batch_size': 32,
-    'num_epochs': 10,
+    'num_epochs': 100,
     'learning_rate': 0.0001,
     'device': 'cuda' if torch.cuda.is_available() else 'cpu'
 }
@@ -45,7 +45,7 @@ if __name__ == "__main__":
     fit_result = trainer.fit(
         dl_train = train_loader,
         dl_test = validation_loader,
-        num_epochs = 20,
+        num_epochs = args['num_epochs'],
         checkpoints = "TUBerlin_checkpoints",
-        early_stopping= 5
+        early_stopping= 30
     )
