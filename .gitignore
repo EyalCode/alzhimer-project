@@ -1,4 +1,5 @@
 preprocessed_point_clouds
+preprocessed_point_clouds.zip
 preprocessed_point_clouds/
 preprocessed_point_clouds/*
 __pycache__/
