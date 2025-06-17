@@ -46,7 +46,7 @@ class TNet(nn.Module):
 
 
 class PointNet2D(nn.Module):
-    def __init__(self, num_classes=10):
+    def __init__(self, num_classes=10, dropout=0.33):
         super(PointNet2D, self).__init__()
         
         # Input transformation network
@@ -78,7 +78,7 @@ class PointNet2D(nn.Module):
         self.bn6 = nn.BatchNorm1d(512)
         self.bn7 = nn.BatchNorm1d(256)
         
-        self.dropout = nn.Dropout(0.3)
+        self.dropout = nn.Dropout(dropout)
         
     def forward(self, x):
         # x shape: batch_size x 2 x num_points
@@ -87,9 +87,9 @@ class PointNet2D(nn.Module):
         
         # Input transformation
         trans = self.input_transform(x)
-        x = x.transpose(2, 1)
-        x = torch.bmm(x, trans)
-        x = x.transpose(2, 1)
+        #x = x.transpose(2, 1)
+        #x = torch.bmm(x, trans)
+        #x = x.transpose(2, 1)
         
         # First shared MLP
         x = F.relu(self.bn1(self.conv1(x)))
