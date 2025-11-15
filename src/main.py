@@ -1,5 +1,5 @@
 import torch
-from torch.nn import CrossEntropyLoss
+from torch.nn import CrossEntropyLoss, NLLLoss
 import matplotlib.pyplot as plt
 from util import plot_point_cloud
 from datasets import TUBerlinDataset
@@ -14,7 +14,7 @@ args = {
     'data_dir': '../preprocessed_point_clouds',
     'num_points': 1024,
     'num_classes': 250,
-    'batch_size': 64,
+    'batch_size': 16,
     'num_epochs': 100,
     'learning_rate': 10e-4,
     'seed': 42,
@@ -49,7 +49,7 @@ if __name__ == "__main__":
     model = PointNetPlusPlus(num_class=args['num_classes'])
     optimizer = torch.optim.AdamW(model.parameters(), lr=args['learning_rate'], betas=(0.9, 0.999), weight_decay=12e-4)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.9)
-    loss_fn = CrossEntropyLoss(label_smoothing=0.10)
+    loss_fn = NLLLoss()
 
     # Train the model
     trainer = PointNet2dClassifierTrainer(
