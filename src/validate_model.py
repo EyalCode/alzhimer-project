@@ -9,20 +9,21 @@ from util import AugmentedDataset
 from util import PointCloudAugmentation
 from util import set_seed
 from util import stratified_split
+from pathlib import Path
+import os
 
 args = {
     'data_dir': 'preprocessed_point_clouds',
     'num_points': 1024,
     'num_classes': 250,
-    'batch_size': 24,
-    'num_epochs': 100,
-    'learning_rate': 10e-4,
+    'batch_size': 16,
     'seed': 42,
     'device': 'cuda' if torch.cuda.is_available() else 'cpu',
+    'checkpoint_path': 'TUBerlin_checkpoints_16.pt'
 }
 
-if __name__ == "__main__":
-    # Load the dataset
+
+def validate_model():
     set_seed(seed=args['seed'], device=args['device'])
     g = torch.Generator()
     g.manual_seed(args['seed'])
@@ -37,38 +38,26 @@ if __name__ == "__main__":
 
     train_dataset, validation_dataset, test_dataset = stratified_split(dataset=dataset, seed=args['seed'])
 
-    augment = PointCloudAugmentation()
-    train_dataset = AugmentedDataset(train_dataset, augment)
-
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args['batch_size'], shuffle=True, collate_fn=TUBerlinDataset.collate_fn)
     validation_loader = torch.utils.data.DataLoader(validation_dataset, batch_size=args['batch_size'], shuffle=False, collate_fn=TUBerlinDataset.collate_fn)
-    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=args['batch_size'], shuffle=False, collate_fn=TUBerlinDataset.collate_fn)
-
 
     # Initialize the model
     model = PointNetPlusPlus(num_class=args['num_classes'])
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args['learning_rate'], betas=(0.9, 0.999), weight_decay=12e-4)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.9)
     loss_fn = NLLLoss()
 
-    # Train the model
-    trainer = PointNet2dClassifierTrainer(
-        model,
-        loss_fn,
-        optimizer,
-        scheduler,
-        args['device']
-    )
+    # Load model checkpoint
+    Path(os.path.dirname(args['checkpoint_path'])).mkdir(exist_ok=True)
+    if os.path.isfile(args['checkpoint_path']):
+        print(f"*** Loading checkpoint file {args['checkpoint_path']}")
+        saved_state = torch.load(args['checkpoint_path'], map_location=args['device'])
+        model.load_state_dict(saved_state["model_state"])
+    else:
+        print(f"No checkpoint found at {args['checkpoint_path']}. Exiting validation.")
+        return
 
-    fit_result = trainer.fit(
-        dl_train = train_loader,
-        dl_test = validation_loader,
-        num_epochs = args['num_epochs'],
-        checkpoints = "TUBerlin_checkpoints",
-        early_stopping= 45
-    )
+    model.to(args['device'])
 
-    # Evaluate on validation set
+    # Evaluate the model
+    print("Evaluating the model on the validation set...")
     model.eval()
     total_loss = 0
     correct = 0
@@ -80,6 +69,9 @@ if __name__ == "__main__":
             points, labels = points.to(args['device']), labels.to(args['device'])
             
             outputs = model(points)
+            if isinstance(outputs, tuple) or isinstance(outputs, list):
+                outputs = outputs[0]
+    
             loss = loss_fn(outputs, labels)
             total_loss += loss.item()
             
@@ -92,3 +84,6 @@ if __name__ == "__main__":
     print(f"Validation Loss: {avg_loss:.4f}")
     print(f"Validation Accuracy: {accuracy:.4f}")
 
+
+if __name__ == "__main__":
+    validate_model()

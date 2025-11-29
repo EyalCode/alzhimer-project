@@ -16,6 +16,12 @@ def plot_point_cloud(point_cloud, title="Point Cloud"):
         point_cloud (torch.Tensor): A tensor of shape (N, 2) representing the point cloud.
         title (str): Title of the plot.
     """
+
+    if point_cloud.shape[0] == 2 and point_cloud.shape[1] > 2:
+        point_cloud = point_cloud.T
+    elif point_cloud.shape[1] != 2:
+        raise ValueError(f"point_cloud must have shape (N,2) or (2,N), got {point_cloud.shape}")
+
     plt.scatter(point_cloud[:, 0], point_cloud[:, 1])
     plt.title(title)
     plt.xlabel("X")

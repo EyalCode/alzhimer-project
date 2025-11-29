@@ -284,6 +284,10 @@ class PointNet2dClassifierTrainer(Trainer):
         # Forward pass through classifier
         outputs = self.model(x)
 
+        # If model returns (pred, ...) unpack the predictions
+        if isinstance(outputs, tuple) or isinstance(outputs, list):
+            outputs = outputs[0]
+
         # Compute loss
         loss = self.loss_fn(outputs, y)
 
@@ -311,6 +315,9 @@ class PointNet2dClassifierTrainer(Trainer):
         # Forward pass only (no gradients needed for testing)
         with torch.no_grad():
             y_pred = self.model(x)
+            if isinstance(y_pred, tuple) or isinstance(y_pred, list):
+                y_pred = y_pred[0]
+
             loss = self.loss_fn(y_pred, y)
 
             # Calculate number of correct predictions
