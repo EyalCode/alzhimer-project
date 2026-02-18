@@ -273,16 +273,35 @@ class PointNet2dClassifierTrainer(Trainer):
         :device: device
         """
         super().__init__(model, loss_fn, optimizer, sched, device)
-
-    def train_batch(self, batch):
-        x, y = batch
-        x, y = x.to(self.device), y.to(self.device)
         
-        # Clear gradients
+    def train_batch(self, batch):
+
+        x, y, imgs = batch
+        x, y, imgs = x.to(self.device), y.to(self.device), imgs.to(self.device)
+        
         self.optimizer.zero_grad()
 
-        # Forward pass through classifier
-        outputs = self.model(x)
+        # 2. Forward pass
+        outputs = self.model(x, imgs)
+        if isinstance(outputs, tuple): outputs = outputs[0]
+
+        # 3. Calculate Loss
+        loss = self.loss_fn(outputs, y)
+        
+        # 4. Backward Pass (THIS IS WHERE GRADIENTS ARE CREATED)
+        loss.backward()
+        
+
+        self.optimizer.step()
+
+        _, predicted = torch.max(outputs.data, 1)
+        correct_predictions = (predicted == y).sum().item()
+
+        return BatchResult(loss.item(), correct_predictions)
+
+        # If model returns (pred, features) unpack the predictions
+        if isinstance(outputs, tuple) or isinstance(outputs, list):
+            outputs = outputs[0]
 
         # Compute loss
         loss = self.loss_fn(outputs, y)
@@ -291,11 +310,9 @@ class PointNet2dClassifierTrainer(Trainer):
         loss.backward()
         self.optimizer.step()
 
-
         # Calculate number of correct predictions
         _, predicted = torch.max(outputs.data, 1)
         correct_predictions = (predicted == y).sum().item()
-
 
         return BatchResult(loss.item(), correct_predictions)
 
@@ -303,14 +320,24 @@ class PointNet2dClassifierTrainer(Trainer):
         """
         Runs a single batch forward through the classifier and calculates loss.
         :param batch: A batch of data from the dataloader.
-        :return: A BatchResult with the loss value (no accuracy for autoencoders).
+        :return: A BatchResult with the loss value.
         """
-        x, y = batch
-        x, y = x.to(self.device), y.to(self.device)
+        # 1. Unpack 3 items (points, label, image)
+        x, y, imgs = batch
+        
+        # 2. Move ALL data to device
+        x = x.to(self.device)
+        y = y.to(self.device)
+        imgs = imgs.to(self.device)
         
         # Forward pass only (no gradients needed for testing)
         with torch.no_grad():
-            y_pred = self.model(x)
+            # 3. Pass BOTH inputs to the model
+            y_pred = self.model(x, imgs)
+            
+            if isinstance(y_pred, tuple) or isinstance(y_pred, list):
+                y_pred = y_pred[0]
+
             loss = self.loss_fn(y_pred, y)
 
             # Calculate number of correct predictions
@@ -321,28 +348,3 @@ class PointNet2dClassifierTrainer(Trainer):
         return BatchResult(loss.item(), correct_predictions)
     
 
-'''
-def train(model, train_loader, optimizer, epoch, device='cuda'):
-    model.train()   
-    running_loss = 0.0
-
-    for batch_idx, (point_cloud, label) in enumerate(train_loader):
-        point_cloud = point_cloud.to(device)
-        label = label.to(device)
-                
-        optimizer.zero_grad()
-        output = model(point_cloud)
-        loss = F.nll_loss(output, label)
-        loss.backward()
-        optimizer.step()
-
-        running_loss += loss.item()
-
-        if batch_idx % 10 == 0:
-            print(f'Epoch: {epoch} [{batch_idx * len(point_cloud)}/{len(train_loader.dataset)} ' + \
-                  f'({100. * batch_idx / len(train_loader):.0f}%)]\tLoss: {loss.item():.6f}')
-
-    avg_loss = running_loss / len(train_loader)
-    print(f'Epoch {epoch} complete. Average loss: {avg_loss:.6f}')
-    return avg_loss
-'''
