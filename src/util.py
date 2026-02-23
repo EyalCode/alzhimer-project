@@ -4,9 +4,14 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import math
 import random
+import os
 from collections import defaultdict
 from torch.utils.data import Subset
 import numpy as np
+from PIL import Image
+from torchvision import datasets, transforms
+from tqdm import tqdm
+from torch.utils.data import Dataset
 
 
 def plot_point_cloud(point_cloud, title="Point Cloud"):
@@ -159,3 +164,111 @@ def accuracy_topk(output, target, topk=(1, 5)):
             res.append(correct_k.mul_(100.0 / batch_size))
         return res
         
+
+class PointCloudDataset(Dataset):
+    def __init__(self, root_dir, num_points=1024, grid_size=4):
+        self.root_dir = root_dir
+        self.files = sorted(os.listdir(root_dir))
+        self.num_points = num_points
+        self.grid_size = grid_size
+
+    def __len__(self):
+        return len(self.files)
+
+    def __getitem__(self, idx):
+        file_path = os.path.join(self.root_dir, self.files[idx])
+        data = torch.load(file_path)
+        point_cloud = data['point_cloud']
+        label = data['label']
+        return point_cloud, label
+
+    def images_to_point_clouds(self, images_path):
+        transform = transforms.Compose([
+            transforms.Grayscale(num_output_channels=1),
+            # transforms.Resize((1024, 1024)),
+            CustomSketchToPointCloud(num_points=self.num_points, grid_size=self.grid_size)
+        ])
+
+        dataset = datasets.ImageFolder(root=images_path, transform=transform)
+        save_dir = self.root_dir
+        os.makedirs(save_dir, exist_ok=True)
+
+        for idx, (image, label) in tqdm(enumerate(dataset), total=len(dataset)):
+            point_cloud = image
+            save_path = os.path.join(save_dir, f"{idx:05d}.pt")
+            torch.save({'point_cloud': point_cloud, 'label': label}, save_path)
+
+        self.files = sorted(os.listdir(self.root_dir))
+
+    @staticmethod
+    def save_point_cloud_plots(dataset, out_path):
+        for i in range(len(dataset)):
+
+            points, label = dataset[i]
+
+            plt.scatter(points[:, 1], points[:, 0], color='red', s=0.1)
+            plt.xlim(-1, 1)
+            plt.ylim(1, -1)
+            plt.show()
+
+            filename = f"plot{i}.png"
+
+            save_path = os.path.join(out_path, filename)
+
+            plt.savefig(save_path)
+            plt.close()
+
+
+class CustomSketchToPointCloud:
+    def __init__(self, num_points=1024, grid_size=4):
+        self.num_points = num_points
+        self.grid_size = grid_size
+
+    def __call__(self, image):
+        image = np.array(image)
+        if np.max(image) > 1:
+            image = image / 255
+        num_of_all_blacks = (image < 0.98).sum()
+        assert num_of_all_blacks > 0
+        height, width = image.shape
+        all_black_pixels = np.empty((0, 2))
+        patches = CustomSketchToPointCloud.split_image_into_parts(image=image, n=self.grid_size)
+        reminder = 1
+
+        for patch, x, y in patches:
+            num_blacks = (patch < 0.98).sum()
+            num_blacks_to_pick = (num_blacks * self.num_points) / num_of_all_blacks
+            if reminder >= 1:
+                reminder -= math.ceil(num_blacks_to_pick) - num_blacks_to_pick
+                num_blacks_to_pick = math.ceil(num_blacks_to_pick)
+            else:
+                reminder += num_blacks_to_pick - math.floor(num_blacks_to_pick)
+                num_blacks_to_pick = math.floor(num_blacks_to_pick)
+
+            black_pixels = np.argwhere(patch < 0.98)
+            if black_pixels.shape[0] > 0:
+                chosen_blacks_indices = np.random.choice(black_pixels.shape[0], size=num_blacks_to_pick, replace=False)
+                chosen_blacks = black_pixels[chosen_blacks_indices]
+                chosen_blacks += np.array([x, y])
+                all_black_pixels = np.append(all_black_pixels, chosen_blacks, axis=0)
+        assert all_black_pixels.shape[0] == self.num_points
+        all_black_pixels[:, 0] = (all_black_pixels[:, 0] / (height - 1)) * 2 - 1  # y-coordinate
+        all_black_pixels[:, 1] = (all_black_pixels[:, 1] / (width - 1)) * 2 - 1  # x-coordinate
+        return torch.tensor(all_black_pixels, dtype=torch.float32)
+
+    @staticmethod
+    def split_image_into_parts(image, n):
+        if isinstance(image, Image.Image):
+            image = np.array(image)
+
+        height, width = image.shape
+
+        patches = []
+        for i in range(0, height, n):
+            for j in range(0, width, n):
+                # Define the current patch's boundaries
+                patch = [image[i:i + n, j:j + n], i, j]
+                # If the patch exceeds the image boundaries, handle it
+                if patch[0].shape[0] == n and patch[0].shape[1] == n:
+                    patches.append(patch)
+        return patches
