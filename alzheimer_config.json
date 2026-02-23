@@ -1,0 +1,40 @@
+{
+    "task": "regression",
+    "model": "PointNetConvNextFusionBase",
+    "num_classes": 1,
+    "use_normals": false,
+
+    "pretrained_checkpoint": "TUBerlin_checkpoints",
+    "freeze_encoders": false,
+
+    "data": {
+        "point_clouds_dir": "alzhimer_point_clouds",
+        "images_dir": "alzhimer_src_images",
+        "train_fraction": 0.7,
+        "val_fraction": 0.15
+    },
+
+    "training": {
+        "batch_size": 16,
+        "num_epochs": 100,
+        "early_stopping": 30,
+        "learning_rate": 1e-4,
+        "learning_rate_cnn": 1e-6,
+        "weight_decay": 0.05,
+        "loss": "SmoothL1",
+        "scheduler": "CosineAnnealingLR",
+        "scheduler_T_max": 100,
+        "scheduler_eta_min": 1e-7
+    },
+
+    "augmentation": {
+        "rotation_range": 50,
+        "scale_range": [0.8, 1.2],
+        "translation_range": 0.15,
+        "jitter_std": 0.003,
+        "point_dropout_rate": 0.1
+    },
+
+    "checkpoint_name": "alzheimer_regression",
+    "seed": 42
+}
