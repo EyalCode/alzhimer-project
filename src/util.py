@@ -247,7 +247,8 @@ class CustomSketchToPointCloud:
 
             black_pixels = np.argwhere(patch < 0.98)
             if black_pixels.shape[0] > 0:
-                chosen_blacks_indices = np.random.choice(black_pixels.shape[0], size=num_blacks_to_pick, replace=False)
+                need_replace = num_blacks_to_pick > black_pixels.shape[0]
+                chosen_blacks_indices = np.random.choice(black_pixels.shape[0], size=num_blacks_to_pick, replace=need_replace)
                 chosen_blacks = black_pixels[chosen_blacks_indices]
                 chosen_blacks += np.array([x, y])
                 all_black_pixels = np.append(all_black_pixels, chosen_blacks, axis=0)
