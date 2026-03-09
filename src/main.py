@@ -341,6 +341,8 @@ def build_loss_fn(config):
             return torch.nn.SmoothL1Loss()
         elif loss_type == "MSE":
             return torch.nn.MSELoss()
+        elif loss_type == "MAE":
+            return torch.nn.L1Loss()
         else:
             raise ValueError(f"Unknown regression loss: {loss_type}")
     else:
