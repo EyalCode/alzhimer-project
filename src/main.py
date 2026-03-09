@@ -205,10 +205,12 @@ def build_dataloaders_alzheimer(config, needs_images):
 
     images_dir = data_cfg.get("images_dir") if needs_images else None
     moca_translation = config.get("moca_translation", False)
+    task = config.get("task", "regression")
     dataset = AlzheimerDataset(
         data_dir=data_cfg["point_clouds_dir"],
         images_dir=images_dir,
         moca_translation=moca_translation,
+        task=task,
     )
 
     split_files = data_cfg.get("split_files")
@@ -250,7 +252,7 @@ def build_dataloaders_alzheimer(config, needs_images):
         val_dataset = AugmentedDataset(val_dataset, point_augment_fn=None)
         test_dataset = AugmentedDataset(test_dataset, point_augment_fn=None)
 
-    collate = AlzheimerDataset.collate_fn
+    collate = AlzheimerDataset.make_collate_fn(task)
     train_loader = torch.utils.data.DataLoader(
         train_dataset, batch_size=batch_size, shuffle=True, collate_fn=collate,
     )
@@ -508,7 +510,8 @@ def main(config):
         freeze_encoders(model, model_name)
 
     # Build dataloaders
-    if task == "regression":
+    dataset_type = config.get("dataset", "tuberlin")
+    if dataset_type == "alzheimer":
         train_loader, val_loader, test_loader = build_dataloaders_alzheimer(config, needs_images)
     else:
         train_loader, val_loader, test_loader = build_dataloaders(config, needs_images)

@@ -104,17 +104,43 @@ class AlzheimerDataset(Dataset):
 
     When images_dir is provided, also loads the corresponding source image.
 
+    Supports two task modes:
+        - "regression": labels are float MOCA scores (0–30)
+        - "classification": labels are int class indices mapped from MOCA scores:
+            0 = Demented (MoCA 0–19), 1 = Mild (MoCA 20–25), 2 = High Cognitive (MoCA 26–30)
+
     Args:
         data_dir: Path to root of point cloud subfolders (e.g. 'alzhimer_point_clouds/').
         images_dir: Optional path to source images with matching subfolder/filename structure.
+        task: "regression" (default) or "classification".
     """
 
     IMG_EXTS = {'.png', '.jpg', '.jpeg', '.bmp', '.tiff', '.tif'}
 
-    def __init__(self, data_dir, images_dir=None, moca_translation=False):
+    MOCA_LEVELS = {
+        "Demented": (0, 19),
+        "Mild": (20, 25),
+        "High Cognitive": (26, 30),
+    }
+
+    @staticmethod
+    def moca_to_class(score):
+        """Map a MoCA score (0–30) to a class index.
+
+        Returns: 0 (Demented, 0–19), 1 (Mild, 20–25), 2 (High Cognitive, 26–30).
+        """
+        if score <= 19:
+            return 0
+        elif score <= 25:
+            return 1
+        else:
+            return 2
+
+    def __init__(self, data_dir, images_dir=None, moca_translation=False, task="regression"):
         self.data_dir = data_dir
         self.images_dir = images_dir
         self.moca_translation = moca_translation
+        self.task = task
         self.samples = []  # list of (pt_path, subfolder, stem)
 
         for subfolder in sorted(os.listdir(data_dir)):
@@ -155,6 +181,9 @@ class AlzheimerDataset(Dataset):
         if self.moca_translation:
             label = label / 3.0 + 12.0
 
+        if self.task == "classification":
+            label = self.moca_to_class(label)
+
         if self.images_dir is not None:
             img_path = self.image_paths.get(idx)
             if img_path is not None:
@@ -166,8 +195,35 @@ class AlzheimerDataset(Dataset):
         return point_cloud, label
 
     @staticmethod
+    def make_collate_fn(task="regression"):
+        """Return a collate function with the appropriate label dtype.
+
+        For regression: labels are torch.float32 (MOCA scores).
+        For classification: labels are torch.long (class indices).
+        """
+        label_dtype = torch.long if task == "classification" else torch.float32
+
+        def collate_fn(batch):
+            if len(batch[0]) == 3:
+                point_clouds, labels, images = zip(*batch)
+                point_clouds = torch.stack(point_clouds, dim=0)
+                labels = torch.tensor(labels, dtype=label_dtype)
+                images = torch.stack(images, dim=0)
+                return point_clouds, labels, images
+            else:
+                point_clouds, labels = zip(*batch)
+                point_clouds = torch.stack(point_clouds, dim=0)
+                labels = torch.tensor(labels, dtype=label_dtype)
+                return point_clouds, labels
+
+        return collate_fn
+
+    @staticmethod
     def collate_fn(batch):
-        """Stack batch items into tensors. Labels are float (MOCA scores)."""
+        """Stack batch items into tensors. Labels are float (MOCA scores).
+
+        Legacy static method for backward compatibility. Prefer make_collate_fn().
+        """
         if len(batch[0]) == 3:
             point_clouds, labels, images = zip(*batch)
             point_clouds = torch.stack(point_clouds, dim=0)
