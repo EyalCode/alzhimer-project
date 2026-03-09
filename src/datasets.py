@@ -178,7 +178,7 @@ class AlzheimerDataset(Dataset):
         item_dict = torch.load(pt_path, weights_only=True)
         point_cloud = item_dict['point_cloud'].T  # (N, 2) → (2, N) channels-first
         label = float(item_dict['label'])
-        if self.moca_translation:
+        if self.moca_translation and label <= 12.0:
             label = label / 3.0 + 12.0
 
         if self.task == "classification":

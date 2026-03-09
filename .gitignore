@@ -34,4 +34,7 @@ __pycache__/*
 .claude
 .claude/*
 .claude/
+claude_utils/
+claude_utils/*
+claude_utils
 CLAUDE.md
